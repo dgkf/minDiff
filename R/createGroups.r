@@ -16,7 +16,9 @@
 #'     assignment. Can be left out, if only continuous variables are to
 #'     be equalized between groups.  A maximum of two nominal criteria
 #'     can be realized.
-#' @param sets_n How many equal groups are to be created.
+#' @param sets_n An integer value specifying how many equal groups are to be
+#'     created, or a vector of decimal values which sum to 1 specifying data 
+#'     split fractions.
 #' @param repetitions How many random assignments are to be tested. Only
 #'     use if `exact` == FALSE.
 #' @param exact Should _all_ possible assignments be tested? This yields
@@ -72,7 +74,18 @@ create_groups <- function(dat, criteria_scale=NULL,
                tolerance_nominal, cases)
 
     ## Initialize a vector that encodes the assignment to groups
-    setAssign  <- sort(rep_len(1:sets_n, cases))
+    if (length(sets_n) == 1 && sets_n %% 1 == 0)
+      setAssign  <- sort(rep_len(1:sets_n, cases))
+    else if (is.numeric(sets_n) && sum(sets_n) == 1) {
+      sets_init <- head(sets_n, -1)
+      
+      setAssign  <- unlist(Map(rep_len, 
+        x = seq_along(sets_init), 
+        length.out = sets_init * cases))
+      
+      # guard against potential accumulation of rounding errors
+      setAssign  <- c(setAssign, rep(length(sets_n), cases - length(setAssign)))
+    }
     
     ## Check if a set was passed that was optizmized in a recent run
     if (!is.null(dat$newSet)) {
@@ -201,7 +214,7 @@ checkInput <- function(dat, sets_n, criteria_scale, criteria_nominal,
     
     ## Warnings
     ## set number does not divide total number of cases, proceed but let user know
-    if (cases %% sets_n != 0) {
+    if (sum(sets_n) != 1 && cases %% sets_n != 0) {
         warning(paste("Set number (", sets_n, ") does not divide length of data (",
                       cases, "). Sets have unequal sizes.", sep=""))
     }
